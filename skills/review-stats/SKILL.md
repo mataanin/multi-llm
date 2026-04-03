@@ -40,4 +40,11 @@ From the `acted_upon` field:
 - Is any tool finding fewer issues over time? (improving code quality or becoming less useful?)
 - Is agreement rate increasing? (tools converging on same standards)
 
+## 7. Token Usage
+From the `tools_tokens` field (use `// {}` fallback for older entries):
+- Per tool: total input, output, cache tokens across all reviews
+- Average tokens per review per tool (only counting reviews where tokens were recorded)
+- Total tokens across all tools and reviews
+- Trend: is token usage growing over time? (if 3+ reviews with token data)
+
 Format the output as a clean text report with aligned columns. Keep it concise.
