@@ -14,14 +14,19 @@ Plan to review: $ARGUMENTS
 
 If no plan text is provided via arguments, ask the user to paste or describe their implementation plan.
 
+**Plan file**: If the arguments include `--plan-file <path>`, read that file to get the current plan and note the path for updating later. If no `--plan-file` is provided, the plan will not be persisted to disk.
+
 ## Process
 
 ### Step 1: Run External Plan Reviews
 
-Launch all 3 external LLM plan review scripts in parallel via Bash (run in background). Use higher reasoning effort for plan review — this is a critical gate where deeper analysis pays off:
+Launch all external LLM plan review scripts in parallel via Bash (run in background). Use higher reasoning effort for plan review — this is a critical gate where deeper analysis pays off:
 
 ```bash
 CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode plan-review --plan "<plan text>"
+```
+```bash
+CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode adversarial-plan-review --plan "<plan text>"
 ```
 ```bash
 .claude/scripts/gemini-dev.sh --mode plan-review --plan "<plan text>"
@@ -29,6 +34,8 @@ CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode plan-review --plan "<pl
 ```bash
 .claude/scripts/cursor-dev.sh --mode plan-review --plan "<plan text>"
 ```
+
+The adversarial Codex run assumes the plan will fail and targets hidden dependencies, missing guards, race conditions, and test gaps — a different lens from the regular plan review.
 
 Replace `<plan text>` with the working plan for the implementation. Properly escape quotes in the plan text.
 
@@ -68,7 +75,18 @@ Present a unified review to the user:
 
 **Verdict**: Is the plan ready for implementation, or does it need revision?
 
-### Step 4: Iterate
+### Step 4: Update Plan File
+
+If a `--plan-file <path>` was provided:
+1. Read the current plan file
+2. Append a `## Plan Review Findings` section (or update it if one already exists) containing:
+   - **Consensus issues** flagged by 2+ reviewers and how they were addressed
+   - **Critical individual findings** that were incorporated
+   - **Testing gaps identified** — specific test cases recommended
+   - **Verdict** — whether the plan was approved as-is or revised
+3. Write the updated plan back to the same file path
+
+### Step 5: Iterate
 
 Ask the user if they want to:
 - Revise the plan and re-review
