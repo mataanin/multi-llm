@@ -20,6 +20,51 @@ You are helping a developer implement a new feature. Follow a systematic approac
 
 ---
 
+## Phase 0: Fresh Branch from Main
+
+**Goal**: Ensure we're starting from the latest `main` on a clean feature branch.
+
+**Actions**:
+1. **Always fetch and rebase first** — this runs unconditionally before anything else:
+   ```bash
+   git fetch origin main
+   git rebase origin/main
+   ```
+   If there are uncommitted changes, commit or stash them first. If the rebase fails due to conflicts, stop and inform the user.
+2. Check if we're already on a clean feature branch:
+   ```bash
+   CURRENT=$(git branch --show-current)
+   # If on main, detached HEAD, or a branch from a previous feature — create a new branch
+   ```
+3. If needed, create a new feature branch from `origin/main`:
+   - Derive a branch name from the feature description using the `patients/` prefix (e.g., `patients/add-health-dashboard`)
+   - ```bash
+     git checkout -b patients/<feature-slug> origin/main
+     ```
+   - If `git checkout` fails because `main` is checked out in another worktree, use:
+     ```bash
+     git checkout --detach origin/main && git checkout -b patients/<feature-slug>
+     ```
+
+**Skip this entire phase** (including the fetch+rebase) only if the user explicitly says to continue on the current branch without updating.
+
+### Asana Ticket Tracking
+
+After the branch is ready, check if `--asana-ticket <GID>` was passed in `$ARGUMENTS`:
+
+- If provided: store the GID as `ASANA_TICKET_GID`. Fetch the task to get its name and URL:
+  ```
+  mcp__asana__get_task task_gid="<GID>"
+  ```
+  Move it to "In Progress" (look up the section by fuzzy name match within the task's project):
+  ```
+  mcp__asana__add_task_to_section task_gid="<GID>" section_gid="<in_progress_section_gid>"
+  ```
+  Confirm: "Moved **[task name]** → In Progress."
+- If not provided: set `ASANA_TICKET_GID=""` and continue — Asana tracking is optional.
+
+---
+
 ## Phase 1: Discovery
 
 **Goal**: Understand what needs to be built
@@ -118,75 +163,206 @@ If the user says "whatever you think is best", provide your recommendation and g
 4. Present to user: brief summary of each approach, trade-offs comparison, **your recommendation with reasoning**, concrete implementation differences
 5. **Ask user which approach they prefer**
 6. When the architecture is approved, split work into subagent tasks where possible
+7. **Save the approved plan to disk**:
+   - Derive a kebab-case filename from the feature description (e.g., "LLM OCR Enhancement" → `llm-ocr-enhancement.md`)
+   - Write the final approved architecture to `docs/plans/<name>.md` using the Write tool
+   - The plan file should contain: Context, Key Files (to create, to modify, reference), Architecture, Implementation Details, a **QA Plan section**, and a **Production Validation section** (see below)
+   - If `ASANA_TICKET_GID` is set, add an **Asana Ticket** line at the very top of the plan (before any other content):
+     ```markdown
+     **Asana Ticket:** [<task name>](https://app.asana.com/0/<project_gid>/<task_gid>) (`<task_gid>`)
+     ```
+   - Include /feature-custom-dev and /pr workflow steps into the plan directly. Adopt review cycles for the feature size.
+   - **QA Plan section** — scope each item to the feature. Omit items not applicable (e.g. no design review for backend-only changes):
+     ```markdown
+     ## QA Plan
+     ### RSpec Tests
+     - [ ] Unit tests for new models/services/jobs (list specific classes)
+     - [ ] Integration tests for new controller actions (list endpoints)
+     - [ ] Edge cases: invalid inputs, nil/empty states, boundary values
+     - [ ] Authorization: unauthorized access returns correct error
+     - [ ] Background jobs: enqueued correctly, execute with correct args
+     ### Playwright E2E Tests
+     - [ ] Happy path flows (list specific user journeys)
+     - [ ] Form validation and error states
+     - [ ] Navigation edge cases (back, direct URL, refresh mid-flow)
+     ### Design Review
+     - [ ] Routes to review: (list affected routes, or "N/A — backend only")
+     ### QA Validation
+     - [ ] /gstack-qa on affected flows (or "N/A — backend only")
+     ### Review Cycle
+     - [ ] /review-cycle — mandatory for all features
+     ```
+   - **Production Validation section** — concrete, queryable signals that confirm the feature is working correctly after deploy. These should be runnable against the production database or observable in logs/dashboards without any code changes. Scope to this feature — every item must be specific and verifiable:
+     ```markdown
+     ## Production Validation
+     ### Database Signals
+     - SQL or Rails runner query to verify expected records exist (e.g. `SELECT count(*) FROM ...`)
+     - Query to confirm no unexpected nulls, wrong states, or missing associations
+     ### Background Jobs
+     - Job class and expected queue: confirm enqueued after trigger (check GoodJob dashboard or query `good_jobs` table)
+     - Expected completion: query for finished jobs within N minutes of trigger
+     ### API / Endpoint Checks
+     - Endpoint + expected response shape (e.g. `GET /api/v1/patients/:id/rollups` returns `{ rollups: [...] }`)
+     - Any webhook or callback that should fire and what to look for in logs
+     ### Feature Flags / Config
+     - Any env var, feature flag, or seed data that must be present in production
+     ### Error Signals (absence = healthy)
+     - Sentry query or log pattern to confirm no new errors introduced (e.g. `is:unresolved <ClassName>`)
+     ### Rollback Trigger
+     - Condition under which to roll back: what broken looks like (e.g. error rate > X%, specific exception spiking)
+     ```
+   - Note the plan file path — you will pass it to subsequent phases
+   - Tell the user: "Plan saved to `docs/plans/<name>.md`"
 
 ---
 
-## Phase 4.5: Plan Review & Revision
+## Phase 4.5: Iterative Plan Review & Revision
 
-**Goal**: Validate the architecture plan with external reviewers before implementation
+**Goal**: Validate the architecture plan through iterative review passes until findings converge
 
-**MANDATORY — DO NOT SKIP THIS PHASE. You MUST execute `/plan-review` using the Skill tool before proceeding to implementation.**
+**MANDATORY — DO NOT SKIP THIS PHASE. You MUST execute the iterative plan review loop before proceeding to implementation.**
+
+### Completeness Principle
+
+Before running the review loop, evaluate the plan for completeness:
+
+**Ask these questions about the plan:**
+- Is the plan doing the **full feature implementation with all edge cases covered**, or is it taking shortcuts? AI-assisted coding makes completeness cheap — 100% test coverage, full edge case handling, and complete error paths cost only marginally more than partial implementations.
+- Does the plan defer work that could reasonably be done now? Flag any "we can add this later" items where the complete version is only modestly more effort.
+- Does the plan cover all edge cases: invalid inputs, boundary values, error states, empty/nil states, concurrent access, unauthorized access?
+- Are tests comprehensive — not just happy path, but adversarial scenarios designed to break the feature?
+
+**Anti-patterns to flag in the plan:**
+- Proposing a simpler approach that covers 90% when the complete approach is only modestly more work
+- Skipping edge case handling
+- Deferring test coverage to a follow-up PR
+- Missing error paths or validation
+
+**Present completeness findings to user before starting the review loop.**
+
+### Review Loop (3–5 passes)
+
+Initialize a `## Review Pass History` section at the bottom of the plan file (`docs/plans/<name>.md`). This is an append-only ledger that tracks every pass.
+
+**For each pass (1 through 5):**
+
+1. **Run `/plan-review`** via the Skill tool — pass the plan file path: `/plan-review --plan-file docs/plans/<name>.md`.
+2. **Classify each finding** as:
+   - **[NEW]** — not raised in any prior pass
+   - **[DUPLICATE]** — same issue (or substantially similar) as a prior pass finding
+3. **Append pass results** to the `## Review Pass History` section in the plan file:
+   ```markdown
+   ### Pass {N}
+   - **New findings**: {count}
+   - **Duplicate findings**: {count}
+   - **Findings**:
+     1. [NEW] {description} — {action taken}
+     2. [DUPLICATE of Pass {M}.{item}] {description} — skipped
+   - **Plan revisions**: {brief description of what changed in the plan body}
+   ```
+4. **Revise the plan body** (Architecture, Implementation Details, etc.) to address all [NEW] findings. Do NOT re-revise for [DUPLICATE] findings.
+5. **Check convergence**:
+   - `pass < 3` → **ALWAYS CONTINUE** (minimum 3 passes required)
+   - `pass >= 3 AND new_findings == 0` → **STOP** (converged)
+   - `pass >= 3 AND new_findings > 0 AND pass < 5` → **CONTINUE**
+   - `pass == 5` → **STOP** (hard cap — flag any remaining [NEW] findings as unresolved)
+
+### After loop completes
+
+1. **Re-read the plan file** to see the full Review Pass History
+2. If the loop hit the hard cap (pass 5) with remaining new findings, present them to the user for decision
+3. Present the final revised plan to user for approval
+
+**GATE CHECK**: Before moving to Phase 5, confirm: "I ran {N} plan review passes. Findings converged at pass {N} with zero new findings." (Or: "Hard cap reached at pass 5 with {X} unresolved findings — user approved proceeding.") If you cannot confirm this, go back and run the loop now.
+
+**CRITICAL**: Plan review is a gate, not just informational. The loop must run at least 3 passes, and critical findings **must** be addressed in the plan before moving to implementation.
+
+---
+
+## Phase 5: Autonomous Execution (Default)
+
+**Goal**: Automatically execute the approved plan without requiring user intervention.
+
+**IMPORTANT**: Autonomous execution is the DEFAULT mode. Do NOT ask the user to choose between autonomous and interactive — proceed directly to autonomous execution after plan approval.
 
 **Actions**:
-1. **Execute `/plan-review` using the Skill tool** — pass the architecture plan as the argument. This is NOT optional. Do NOT summarize what plan-review would do — actually run it.
-2. If reviewers identify critical findings (security gaps, missing edge cases, architectural issues):
-   - **Revise the plan** to address those findings before proceeding
-   - Re-run `/plan-review` via the Skill tool again if changes are substantial
-3. Present revised plan to user for final approval
+1. Present a brief final plan summary to the user
+2. Inform the user that autonomous execution is starting:
 
-**GATE CHECK**: Before moving to Phase 5, confirm: "I executed `/plan-review` and addressed its findings." If you cannot confirm this, go back and run it now.
+   > **Plan approved. Starting autonomous execution.**
+   > I'll implement everything, write Playwright tests, run design review, QA, and create the PR — all without stopping. You'll get a final report when the PR is ready and CI is green.
 
-**CRITICAL**: Plan review is a gate, not just informational. Critical findings **must** be addressed in the plan before moving to implementation.
+3. **Start Ralph Loop for hands-free execution** using the Skill tool: `/ralph-loop "Continue autonomous execution. Read the plan file at docs/plans/<name>.md and the progress log at .claude/logs/autonomous/ to determine which phases are complete. Resume from the first incomplete phase and execute through to PR creation and green CI. Output <promise>AUTONOMOUS EXECUTION COMPLETE</promise> only when the PR exists and CI is green." --completion-promise "AUTONOMOUS EXECUTION COMPLETE" --max-iterations 3`
 
----
-
-## Phase 5: Implementation
-
-**Goal**: Build the feature
-
-**DO NOT START WITHOUT USER APPROVAL**
-
-**Actions**:
-1. Wait for explicit user approval
-2. Read all relevant files identified in previous phases
-3. Implement following chosen architecture
-4. Follow codebase conventions strictly
-5. Write clean, well-documented code
-6. Update todos as you progress
+   Replace `<name>` with the actual plan filename. Ralph Loop re-invokes the same prompt each iteration — Claude reads its own progress log to resume from where it left off, without user nudging. This handles everything from implementation through PR creation. Skip Phases 6-9 below — they are all handled by the loop.
 
 ---
 
-## Phase 6: Quality Review
+## Phase 6: Quality Review (Interactive Mode)
 
 **Goal**: Ensure code is simple, DRY, elegant, easy to read, and functionally correct
 
 **MANDATORY — DO NOT SKIP `/test-more`. You MUST execute it using the Skill tool before proceeding to Phase 7.**
 
 **Actions**:
-1. **Execute `/test-more` using the Skill tool** — this runs the adversarial and comprehensive testing checklist. This is NOT optional. Do NOT just list what tests to write — actually invoke the skill so it drives the testing process.
-2. Launch 3 code-reviewer agents in parallel with different focuses: simplicity/DRY/elegance, bugs/functional correctness, project conventions/abstractions
-3. Review INSIGHTS.md pattern compliance — check changes against documented anti-patterns
-4. Validate adherence to ARCHITECTURE.md
-5. Consolidate findings and identify highest severity issues that you recommend fixing
-6. **Present findings to user and ask what they want to do** (fix now, fix later, or proceed as-is)
-7. Address issues based on user decision
-8. **Iterate until**: all tests pass, no lint errors, frontend builds, all review comments addressed
+1. **Re-read the plan file** (`docs/plans/<name>.md`) to recover full context
+2. **Execute `/test-more` using the Skill tool** — pass the plan file path: `/test-more --plan-file docs/plans/<name>.md`. This runs the adversarial and comprehensive testing checklist. This is NOT optional. Do NOT just list what tests to write — actually invoke the skill so it drives the testing process.
+3. Launch 3 code-reviewer agents in parallel with different focuses: simplicity/DRY/elegance, bugs/functional correctness, project conventions/abstractions
+4. Review INSIGHTS.md pattern compliance — check changes against documented anti-patterns
+5. Validate adherence to ARCHITECTURE.md
+6. Consolidate findings and identify highest severity issues that you recommend fixing
+7. **Present findings to user and ask what they want to do** (fix now, fix later, or proceed as-is)
+8. Address issues based on user decision
+9. **Iterate until**: all tests pass, no lint errors, frontend builds, all review comments addressed
+10. **Re-read the plan file** after test-more completes — it may have been updated with testing strategy
 
 **GATE CHECK**: Before moving to Phase 7, confirm: "I executed `/test-more` via the Skill tool and all critical test gaps have been addressed." If you cannot confirm this, go back and run it now.
 
 ---
 
-## Phase 7: Summary & PR
+## Phase 7: Summary & PR (Interactive Mode)
 
 **Goal**: Document what was accomplished and prepare for review
 
 **Actions**:
 1. Mark all todos complete
-2. Summarize:
+2. **Re-read the plan file** (`docs/plans/<name>.md`) for accurate summary
+3. Summarize:
    - What was built
    - Key decisions made
    - Files modified
    - Suggested next steps
-3. **Execute `/pr` using the Skill tool** to run the full PR preparation workflow (health checks, code quality, multi-review, integration testing, screenshots, and PR creation). Do NOT manually replicate what `/pr` does — invoke it via the Skill tool so it drives each phase.
+4. **Execute `/pr` using the Skill tool** to run the full PR preparation workflow (health checks, code quality, review cycle, integration testing, screenshots, and PR creation). Do NOT manually replicate what `/pr` does — invoke it via the Skill tool so it drives each phase.
+
+---
+
+## Phase 8: Workflow Retrospective
+
+**Goal**: Collect feedback on how the development workflow and tooling performed.
+
+**Actions**:
+
+1. **Solicit feedback** — Ask the user using `AskUserQuestion`:
+
+   > **Quick retro on this feature build:**
+   >
+   > 1. How did the workflow go? (0-10)
+   > 2. What worked well?
+   > 3. What was slow, frustrating, or broken in the tooling?
+   >
+   > (Brief is fine — even just a number and a few words.)
+
+2. **Capture improvements** — Save to `tool-improvements/feature-dev-workflow.md` (append if exists):
+
+   ```markdown
+   ## YYYY-MM-DD — <feature name>
+   **Rating:** <0-10>
+
+   ### What worked
+   - <from feedback>
+
+   ### Tooling / workflow improvements
+   - [ ] <actionable item>
+   ```
 
 ---
