@@ -43,7 +43,7 @@ Run a comprehensive code review similar to Cursor's Bugbot using the `cursor-rev
 - **With commit hash**: Reviews the specified commit with prefix "Run for <commit hash> commit"
 - **With commit range**: Reviews commits between start and end (inclusive) with prefix "Run for commits <start hash>..<end hash>"
 
-The script uses the prompt from `.claude/cursor-code-review-prompt.md` and runs it through the `agent` command using the **Composer 1** model.
+The script uses the prompt from `.claude/cursor-code-review-prompt.md` and runs it through the `agent` command using the **Composer 2** model.
 
 ### Change Description Validation
 
