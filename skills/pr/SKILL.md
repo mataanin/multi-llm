@@ -258,8 +258,8 @@ If the developer selects "Skip screenshots", proceed directly to Phase 5.
 For each selected route:
 
 1. **Navigate and authenticate:**
-   - Patient routes (`/patient/*`): Log in as `sleepingbeauty@empowersleep.com` / `Hello123`
-   - Admin routes (`/provider/*`): Log in as `sahilchopramd@empowersleep.com` / `Hello123`
+   - Patient routes (`/patient/*`): Log in as your patient test account
+   - Admin routes (`/provider/*`): Log in as your admin/provider test account
    - Use `mcp__playwright__browser_navigate` to reach the route
    - Use `mcp__playwright__browser_wait_for` for network idle
 
@@ -296,7 +296,7 @@ Use the release asset URLs (not relative paths) in the PR description between ma
 ```markdown
 ## Screenshots
 <!-- release-notes-screenshots -->
-![patient-feed](https://github.com/empowersleep/dream/releases/download/screenshots-assets/2026-03-03-patient-feed.jpg)
+![screen-name](https://github.com/{OWNER}/{REPO}/releases/download/screenshots-assets/YYYY-MM-DD-screen-name.jpg)
 <!-- /release-notes-screenshots -->
 ```
 
