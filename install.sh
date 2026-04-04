@@ -63,7 +63,7 @@ done
 # --- .agent/skills/ directory ---
 mkdir -p "$TARGET_DIR/.agent/skills"
 
-for skill in multi-review plan-review codex-review gemini-review cursor-review review-stats feature-custom-dev; do
+for skill in multi-review plan-review codex-review gemini-review cursor-review review-stats feature-custom-dev pr autonomous-execute pr-ready; do
   SKILL_REL=$(relpath "$TARGET_DIR/.agent/skills" "$MULTI_LLM_DIR/skills/$skill")
   if [ -L "$TARGET_DIR/.agent/skills/$skill" ]; then
     echo "  .agent/skills/$skill: already symlinked (skipping)"
