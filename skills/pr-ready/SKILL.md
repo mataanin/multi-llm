@@ -123,7 +123,8 @@ git push && ./.claude/scripts/request-github-reviews.sh "$PR_NUMBER"
 Check who has reviewed:
 ```bash
 PR_NUMBER=$(gh pr view --json number -q .number)
-REVIEWERS=$(gh api repos/empowersleep/dream/pulls/$PR_NUMBER/reviews --jq '[.[].user.login] | unique | join(", ")')
+REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+REVIEWERS=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --jq '[.[].user.login] | unique | join(", ")')
 echo "Reviews from: $REVIEWERS"
 ```
 
