@@ -23,16 +23,15 @@ If no plan text is provided via arguments, ask the user to paste or describe the
 Launch all external LLM plan review scripts in parallel via Bash (run in background). Use higher reasoning effort for plan review — this is a critical gate where deeper analysis pays off:
 
 ```bash
-CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode plan-review --plan "<plan text>"
-```
-```bash
-CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode adversarial-plan-review --plan "<plan text>"
-```
-```bash
-.claude/scripts/gemini-dev.sh --mode plan-review --plan "<plan text>"
-```
-```bash
-.claude/scripts/cursor-dev.sh --mode plan-review --plan "<plan text>"
+CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode plan-review --plan "<plan text>" &
+CODEX_PID=$!
+CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode adversarial-plan-review --plan "<plan text>" &
+CODEX_ADV_PID=$!
+.claude/scripts/gemini-dev.sh --mode plan-review --plan "<plan text>" &
+GEMINI_PID=$!
+.claude/scripts/cursor-dev.sh --mode plan-review --plan "<plan text>" &
+CURSOR_PID=$!
+wait $CODEX_PID $CODEX_ADV_PID $GEMINI_PID $CURSOR_PID
 ```
 
 The adversarial Codex run assumes the plan will fail and targets hidden dependencies, missing guards, race conditions, and test gaps — a different lens from the regular plan review.
