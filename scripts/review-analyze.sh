@@ -8,13 +8,13 @@
 #   review-analyze.sh 20250210-143022
 #   review-analyze.sh 20250210-143022 --reviewer user@example.com --review-type plan
 #
-# Discovers tools dynamically from review output files: .claude/reviews/<timestamp>-<tool>.txt
+# Discovers tools dynamically from review output files: docs/reviews/<timestamp>-<tool>.txt
 # Appends results to review-analytics.json
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/log-common.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-REVIEW_DIR="$REPO_ROOT/.claude/reviews"
+REVIEW_DIR="$REPO_ROOT/docs/reviews"
 ANALYTICS_FILE="$REPO_ROOT/review-analytics.json"
 
 # Parse arguments
@@ -466,10 +466,11 @@ if [ -z "$BRANCH" ]; then
   BRANCH=$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --short HEAD)
 fi
 
-# Build findings JSON and tools_models map dynamically
+# Build findings JSON and tools_models/tokens maps dynamically
 FINDINGS_JSON='{}'
 TOOLS_MODELS='{}'
 TOOLS_REASONING='{}'
+TOOLS_TOKENS='{}'
 for tool in "${TOOLS[@]}"; do
   tool_findings=$(cat "$FINDINGS_DIR/$tool.json")
   FINDINGS_JSON=$(echo "$FINDINGS_JSON" | jq --arg t "$tool" --argjson f "$tool_findings" '.[$t] = $f')
@@ -485,6 +486,12 @@ for tool in "${TOOLS[@]}"; do
     reasoning_level=$(cat "$reasoning_file" | tr -d '[:space:]')
     TOOLS_REASONING=$(echo "$TOOLS_REASONING" | jq --arg t "$tool" --arg r "$reasoning_level" '.[$t] = $r')
   fi
+  # Read tokens sidecar file if present (skip empty objects)
+  tokens_file="$REVIEW_DIR/${TIMESTAMP}-${tool}.tokens"
+  if [ -f "$tokens_file" ] && jq -e 'keys | length > 0' "$tokens_file" >/dev/null 2>&1; then
+    tokens_data=$(cat "$tokens_file")
+    TOOLS_TOKENS=$(echo "$TOOLS_TOKENS" | jq --arg t "$tool" --argjson d "$tokens_data" '.[$t] = $d')
+  fi
 done
 
 REVIEW_ENTRY=$(jq -n \
@@ -498,6 +505,7 @@ REVIEW_ENTRY=$(jq -n \
   --argjson tools_status "$TOOLS_STATUS" \
   --argjson tools_models "$TOOLS_MODELS" \
   --argjson tools_reasoning "$TOOLS_REASONING" \
+  --argjson tools_tokens "$TOOLS_TOKENS" \
   '{
     timestamp: $ts,
     branch: $branch,
@@ -506,6 +514,7 @@ REVIEW_ENTRY=$(jq -n \
     tools_status: $tools_status,
     tools_models: $tools_models,
     tools_reasoning: $tools_reasoning,
+    tools_tokens: $tools_tokens,
     findings: $findings,
     matching: $matching,
     acted_upon: $acted

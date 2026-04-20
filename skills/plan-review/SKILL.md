@@ -31,10 +31,23 @@ CODEX_ADV_PID=$!
 GEMINI_PID=$!
 .claude/scripts/cursor-dev.sh --mode plan-review --plan "<plan text>" &
 CURSOR_PID=$!
-wait $CODEX_PID $CODEX_ADV_PID $GEMINI_PID $CURSOR_PID
+.claude/scripts/copilot-dev.sh --mode plan-review --plan "<plan text>" &
+COPILOT_PID=$!
+.claude/scripts/copilot-dev.sh --mode adversarial-plan-review --plan "<plan text>" &
+COPILOT_ADV_PID=$!
+REVIEW_FAILED=0
+wait $CODEX_PID        || { echo "WARNING: codex plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+wait $CODEX_ADV_PID    || { echo "WARNING: codex adversarial-plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+wait $GEMINI_PID       || { echo "WARNING: gemini plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+wait $CURSOR_PID       || { echo "WARNING: cursor plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+wait $COPILOT_PID      || { echo "WARNING: copilot plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+wait $COPILOT_ADV_PID  || { echo "WARNING: copilot adversarial-plan-review failed — check .claude/logs/llm-errors.log"; REVIEW_FAILED=1; }
+[ $REVIEW_FAILED -eq 0 ] || echo "WARNING: One or more plan reviewers failed — continue with available results"
 ```
 
 The adversarial Codex run assumes the plan will fail and targets hidden dependencies, missing guards, race conditions, and test gaps — a different lens from the regular plan review.
+
+The Copilot adversarial run (`copilot-dev.sh --mode adversarial-plan-review`) applies the same adversarial stance using the GitHub Copilot CLI, providing an independent adversarial perspective powered by Claude Sonnet 4.6.
 
 Replace `<plan text>` with the working plan for the implementation. Properly escape quotes in the plan text.
 

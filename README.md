@@ -1,6 +1,6 @@
 # multi-llm
 
-Multi-LLM development and code review pipeline for Claude Code. Orchestrates Claude, OpenAI Codex, Google Gemini, and Cursor Agent for parallel code review, codebase exploration, architecture design, and plan validation.
+Multi-LLM development and code review pipeline for Claude Code. Orchestrates Claude, OpenAI Codex, Google Gemini, Cursor Agent, and GitHub Copilot for parallel code review (standard + adversarial), codebase exploration, architecture design, and plan validation.
 
 ## What's Included
 
@@ -8,29 +8,34 @@ Multi-LLM development and code review pipeline for Claude Code. Orchestrates Cla
 
 | Script | Purpose |
 |--------|---------|
-| `codex-dev.sh` | Codex development tasks (explore, architect, plan-review) |
+| `codex-dev.sh` | Codex development tasks (explore, architect, plan-review, adversarial-plan-review) |
 | `gemini-dev.sh` | Gemini development tasks |
 | `cursor-dev.sh` | Cursor Agent development tasks |
+| `copilot-dev.sh` | GitHub Copilot CLI development tasks |
 | `codex-review.sh` | Codex code review |
+| `codex-adversarial-review.sh` | Codex adversarial review (challenges assumptions, surfaces hidden failures) |
 | `gemini-review.sh` | Gemini code review |
 | `cursor-review.sh` | Cursor Agent code review |
 | `claude-review.sh` | Claude Code code review |
+| `copilot-review.sh` | GitHub Copilot CLI code review |
+| `copilot-adversarial-review.sh` | GitHub Copilot adversarial code review |
 | `review-analyze.sh` | Cross-tool finding extraction and agreement analysis |
 | `harvest-pr-reviews.sh` | Ingest GitHub bot reviews (Copilot, Cursor BugBot) |
 | `ensure-pr.sh` | Create PR if one doesn't exist for current branch |
 | `request-github-reviews.sh` | Request reviews from GitHub bots |
 | `gh-comment-threaded.sh` | Post threaded PR comments |
 | `gh-find-comment-thread.sh` | Find existing comment threads |
+| `test-skill-access.sh` | Probe whether external review CLIs can discover/invoke skills (research tool) |
 | `dev-common.sh` | Shared logic for dev scripts |
 | `review-common.sh` | Shared logic for review scripts |
 | `log-common.sh` | Error logging and timeout utilities |
 
 ### Prompts (`prompts/`)
 
-- **Code review prompts**: Per-tool review instructions with confidence scoring, false positive filtering, and structured output format
-- **Explore prompts**: Codebase analysis and feature tracing instructions
-- **Architect prompts**: Architecture blueprint generation with component design and build sequences
-- **Plan review prompts**: Implementation plan validation with adversarial test assessment
+- **Code review prompts**: Per-tool review instructions with confidence scoring, false positive filtering, and structured output format. Adversarial variants for Codex and Copilot flip the stance — assume the change is broken and hunt for failure paths.
+- **Explore prompts**: Codebase analysis and feature tracing instructions (Codex, Gemini, Cursor, Copilot)
+- **Architect prompts**: Architecture blueprint generation with component design and build sequences (Codex, Gemini, Cursor, Copilot)
+- **Plan review prompts**: Implementation plan validation (Codex, Gemini, Cursor, Copilot). Adversarial variants for Codex and Copilot stress-test plans by assuming they'll fail.
 
 ### Skills (`skills/`)
 
@@ -50,21 +55,20 @@ Claude Code skills (`.agent/skills/`) for orchestrating the pipeline:
 
 ### Prerequisites
 
-Install the CLI tools you want to use:
+The install script checks for all dependencies and reports what's missing. You can also install them manually:
 
-```bash
-# Claude Code (required)
-npm i -g @anthropic-ai/claude-code
+| Tool | Package / Install | CLI | Required |
+|------|-------------------|-----|----------|
+| Claude Code | `npm i -g @anthropic-ai/claude-code` | `claude` | **yes** |
+| OpenAI Codex | `npm i -g @openai/codex` | `codex` | optional |
+| Google Gemini | `npm i -g @google/gemini-cli` | `gemini` | optional |
+| GitHub Copilot CLI | `npm i -g @github/copilot` or `brew install copilot-cli` | `copilot` | optional |
+| Cursor Agent | [docs.cursor.com/cli](https://docs.cursor.com/cli) | `agent` | optional |
+| GitHub CLI | `brew install gh` | `gh` | for PR bot harvesting |
+| jq | `brew install jq` | `jq` | for JSON parsing |
+| Python 3 | system package manager | `python3` | **yes** |
 
-# OpenAI Codex (optional)
-npm i -g @openai/codex
-
-# Google Gemini (optional)
-npm i -g @google/gemini-cli
-
-# Cursor Agent (optional)
-# Follow Cursor Agent CLI installation instructions
-```
+Each optional tool is independent — scripts gracefully skip tools that aren't installed.
 
 ### Install into a project
 
@@ -74,6 +78,15 @@ npm i -g @google/gemini-cli
 
 # Or from anywhere:
 /path/to/multi-llm/install.sh /path/to/your/project
+
+# Auto-install missing npm packages:
+/path/to/multi-llm/install.sh . --install-deps
+
+# Only run dependency check (no symlinks):
+/path/to/multi-llm/install.sh --deps-only
+
+# Skip dependency check:
+/path/to/multi-llm/install.sh . --skip-deps
 ```
 
 This creates symlinks in `.claude/` and `.agent/skills/` pointing back to this repo.
@@ -88,10 +101,9 @@ ln -s ../multi-llm/scripts .claude/scripts
 ln -s ../multi-llm/prompts .claude/prompts
 
 # Review prompts (referenced from .claude/ root by scripts)
-ln -s ../multi-llm/prompts/codex-code-review-prompt.md .claude/codex-code-review-prompt.md
-ln -s ../multi-llm/prompts/gemini-code-review-prompt.md .claude/gemini-code-review-prompt.md
-ln -s ../multi-llm/prompts/cursor-code-review-prompt.md .claude/cursor-code-review-prompt.md
-ln -s ../multi-llm/prompts/claude-code-review-prompt.md .claude/claude-code-review-prompt.md
+for p in claude codex gemini cursor copilot copilot-adversarial; do
+  ln -s ../multi-llm/prompts/${p}-code-review-prompt.md .claude/${p}-code-review-prompt.md
+done
 
 # Skills
 for skill in multi-review plan-review codex-review gemini-review cursor-review review-stats feature-custom-dev; do
@@ -137,6 +149,7 @@ CODEX_REASONING=high ./.claude/scripts/codex-dev.sh --mode architect --task "fea
 | `GEMINI_MODEL` | *(CLI default)* | Gemini model |
 | `GEMINI_NODE_VERSION` | `20` | Minimum Node.js version for Gemini CLI |
 | `CURSOR_MODEL` | `composer-1.5` | Cursor Agent model |
+| `COPILOT_MODEL` | `claude-sonnet-4.6` | GitHub Copilot CLI model |
 | `CLAUDE_REVIEW_MODEL` | `opus-4.6` | Claude review model |
 | `REVIEW_TIMEOUT` | `600` | Timeout in seconds for each review tool |
 
@@ -147,8 +160,9 @@ scripts/
   log-common.sh          ← Timeout, error logging, branch detection
   dev-common.sh          ← Arg parsing, prompt loading for dev tasks
   review-common.sh       ← Arg parsing, diff context, prompt loading for reviews
-  {codex,gemini,cursor}-dev.sh     ← Thin wrappers: set tool vars, source dev-common
-  {codex,gemini,cursor,claude}-review.sh  ← Thin wrappers: set tool vars, source review-common
+  {codex,gemini,cursor,copilot}-dev.sh              ← Thin wrappers: set tool vars, source dev-common
+  {codex,gemini,cursor,claude,copilot}-review.sh    ← Thin wrappers: set tool vars, source review-common
+  {codex,copilot}-adversarial-review.sh             ← Adversarial variants using hostile prompts
   review-analyze.sh      ← Deterministic cross-tool finding extraction + agreement analysis
   harvest-pr-reviews.sh  ← Ingest GitHub bot reviews into the analytics pipeline
 ```

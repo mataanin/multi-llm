@@ -21,12 +21,9 @@ if [ -z "$CURRENT_NODE_MAJOR" ] || [ "$CURRENT_NODE_MAJOR" -lt "$GEMINI_NODE_VER
   fi
 fi
 
-# Model preference: use GEMINI_MODEL env var, or let CLI pick its default
-if [ -n "${GEMINI_MODEL:-}" ]; then
-  GEMINI_MODEL_ARGS=(--model "$GEMINI_MODEL")
-else
-  GEMINI_MODEL_ARGS=()
-fi
+# Model preference: use GEMINI_MODEL env var, or default to gemini-3.1-pro-preview
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
+GEMINI_MODEL_ARGS=(--model "$GEMINI_MODEL")
 
 LLM_OUTPUT=$(mktemp)
 _run_llm_tool "$LLM_OUTPUT" --cleanup -- gemini --yolo "${GEMINI_MODEL_ARGS[@]}" -p "$FULL_PROMPT"

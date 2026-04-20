@@ -74,7 +74,7 @@ fi
 
 # Validate mode
 if [ -z "$MODE" ]; then
-  echo "Error: --mode is required (explore|architect|plan-review)"
+  echo "Error: --mode is required (explore|architect|plan-review|adversarial-plan-review)"
   exit 1
 fi
 
@@ -85,14 +85,14 @@ case "$MODE" in
       exit 1
     fi
     ;;
-  plan-review)
+  plan-review|adversarial-plan-review)
     if [ -z "$PLAN_TEXT" ]; then
-      echo "Error: --plan is required for mode 'plan-review'"
+      echo "Error: --plan is required for mode '$MODE'"
       exit 1
     fi
     ;;
   *)
-    echo "Error: Invalid mode '$MODE'. Must be explore, architect, or plan-review"
+    echo "Error: Invalid mode '$MODE'. Must be explore, architect, plan-review, or adversarial-plan-review"
     exit 1
     ;;
 esac
@@ -118,7 +118,7 @@ case "$MODE" in
   explore|architect)
     FULL_PROMPT=$(printf "## Task\n\n%s\n\n---\n\n%s" "$TASK_DESC" "$PROMPT_CONTENT")
     ;;
-  plan-review)
+  plan-review|adversarial-plan-review)
     FULL_PROMPT=$(printf "## Plan to Review\n\n%s\n\n---\n\n%s" "$PLAN_TEXT" "$PROMPT_CONTENT")
     ;;
 esac

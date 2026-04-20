@@ -16,7 +16,7 @@ LLM_CLI_CHECK="$REVIEW_CLI_CHECK"
 LLM_INSTALL_HINT="$REVIEW_INSTALL_HINT"
 
 # Review output capture directory
-REVIEW_OUTPUT_DIR=".claude/reviews"
+REVIEW_OUTPUT_DIR="docs/reviews"
 mkdir -p "$REVIEW_OUTPUT_DIR"
 
 # Use shared timestamp from parent process (for parallel runs), or generate one

@@ -8,6 +8,22 @@ Critically review the proposed implementation plan above. Validate it against th
 
 Use the read-only sandbox to verify file paths, read referenced code, and check that the plan aligns with the actual codebase state.
 
+## Completeness Principle
+
+Before reviewing individual criteria, evaluate the plan for completeness:
+
+**Ask these questions:**
+- Is the plan doing the **full feature implementation with all edge cases covered**, or is it taking shortcuts? AI-assisted coding makes completeness cheap — 100% test coverage, full edge case handling, and complete error paths cost only marginally more than partial implementations.
+- Does the plan defer work that could reasonably be done now? Flag any "we can add this later" items where the complete version is only modestly more effort.
+- Does the plan cover all edge cases: invalid inputs, boundary values, error states, empty/nil states, concurrent access, unauthorized access?
+- Are tests comprehensive — not just happy path, but adversarial scenarios designed to break the feature?
+
+**Anti-patterns to flag:**
+- Proposing a simpler approach that covers 90% when the complete approach is only modestly more work
+- Skipping edge case handling
+- Deferring test coverage to a follow-up PR
+- Missing error paths or validation
+
 ## Review Criteria
 
 ### 1. Correctness
@@ -53,6 +69,8 @@ Approach this section with the mindset of **breaking the feature** and **finding
 - What are the rollback options?
 
 ## Output Format
+
+**Completeness Assessment**: Is the plan doing the full implementation with all edge cases covered, or taking shortcuts? Flag any deferred work, missing edge cases, or incomplete implementations where the complete version would cost only modestly more.
 
 **Correctness Issues**: Inaccuracies in file paths, patterns, or assumptions (with evidence from codebase)
 

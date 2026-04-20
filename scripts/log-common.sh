@@ -22,22 +22,34 @@ _timeout_cmd() {
 REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-600}"
 
 # Run an LLM CLI command with timeout and error handling.
-# Usage: _run_llm_tool <output_file> [--cleanup] -- <command...>
+# Usage: _run_llm_tool <output_file> [--cleanup] [--quiet] -- <command...>
 #   --cleanup: remove output_file on exit (for dev scripts using mktemp)
+#   --quiet:   write to file only (no tee to stdout), for JSON capture
 # Returns the command's exit code.
 _run_llm_tool() {
   local output_file="$1"
   shift
   local cleanup=false
-  if [ "$1" = "--cleanup" ]; then
-    cleanup=true
-    shift
-  fi
+  local quiet=false
+  while true; do
+    case "$1" in
+      --cleanup) cleanup=true; shift ;;
+      --quiet)   quiet=true;   shift ;;
+      *)         break ;;
+    esac
+  done
   [ "$1" = "--" ] && shift
 
   set +e
-  _timeout_cmd "$REVIEW_TIMEOUT" "$@" 2>&1 | tee "$output_file"
-  local exit_code=${PIPESTATUS[0]}
+  if $quiet; then
+    # Redirect only stdout to file; keep stderr separate so it doesn't
+    # corrupt JSON output that callers parse with json.load/jq.
+    _timeout_cmd "$REVIEW_TIMEOUT" "$@" > "$output_file" 2>>"$LLM_LOG_FILE"
+    local exit_code=$?
+  else
+    _timeout_cmd "$REVIEW_TIMEOUT" "$@" 2>&1 | tee "$output_file"
+    local exit_code=${PIPESTATUS[0]}
+  fi
   set -e
 
   if [ "$exit_code" -eq 124 ]; then

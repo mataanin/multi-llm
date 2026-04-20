@@ -12,7 +12,7 @@ TIMESTAMP="${2:?Usage: harvest-pr-reviews.sh <pr-number> <timestamp>}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-REVIEW_DIR="$REPO_ROOT/.claude/reviews"
+REVIEW_DIR="$REPO_ROOT/docs/reviews"
 mkdir -p "$REVIEW_DIR"
 
 if ! command -v gh >/dev/null 2>&1; then

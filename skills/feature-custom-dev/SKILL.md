@@ -100,7 +100,7 @@ Initial request: $ARGUMENTS
    - "Identify UI patterns, testing approaches, or extension points relevant to [feature]"
 
 ### External LLMs (launch in parallel with Claude agents)
-2. Run all 3 external explore scripts in parallel via Bash (run in background). Use higher reasoning effort for exploration — deeper analysis of the codebase produces better plans:
+2. Run all 4 external explore scripts in parallel via Bash (run in background). Use higher reasoning effort for exploration — deeper analysis of the codebase produces better plans:
    ```bash
    CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode explore --task "<feature description>"
    ```
@@ -109,6 +109,9 @@ Initial request: $ARGUMENTS
    ```
    ```bash
    .claude/scripts/cursor-dev.sh --mode explore --task "<feature description>"
+   ```
+   ```bash
+   .claude/scripts/copilot-dev.sh --mode explore --task "<feature description>"
    ```
 
    Replace `<feature description>` with the actual task/feature being explored. If a script fails (tool not installed, credentials missing, timeout), check `.claude/logs/llm-errors.log` for details, report the failure cause to the user, and continue — external LLMs are supplementary.
@@ -145,7 +148,7 @@ If the user says "whatever you think is best", provide your recommendation and g
 1. Launch 2 code-architect agents in parallel with extended thinking enabled. Different focuses: minimal changes (smallest change, maximum reuse), clean architecture (maintainability, elegant abstractions), or pragmatic balance (speed + quality)
 
 ### External LLMs (launch in parallel with Claude agents)
-2. Run all 3 external architect scripts in parallel via Bash (run in background). Use higher reasoning effort for architecture — this shapes the entire implementation:
+2. Run all 4 external architect scripts in parallel via Bash (run in background). Use higher reasoning effort for architecture — this shapes the entire implementation:
    ```bash
    CODEX_REASONING=high .claude/scripts/codex-dev.sh --mode architect --task "<feature description with context from exploration phase>"
    ```
@@ -154,6 +157,9 @@ If the user says "whatever you think is best", provide your recommendation and g
    ```
    ```bash
    .claude/scripts/cursor-dev.sh --mode architect --task "<feature description with context from exploration phase>"
+   ```
+   ```bash
+   .claude/scripts/copilot-dev.sh --mode architect --task "<feature description with context from exploration phase>"
    ```
 
    If a script fails (tool not installed, credentials missing, timeout), check `.claude/logs/llm-errors.log` for details, report the failure cause to the user, and continue.
@@ -292,9 +298,9 @@ Initialize a `## Review Pass History` section at the bottom of the plan file (`d
    > **Plan approved. Starting autonomous execution.**
    > I'll implement everything, write Playwright tests, run design review, QA, and create the PR — all without stopping. You'll get a final report when the PR is ready and CI is green.
 
-3. **Start Ralph Loop for hands-free execution** using the Skill tool: `/ralph-loop "Continue autonomous execution. Read the plan file at docs/plans/<name>.md and the progress log at .claude/logs/autonomous/ to determine which phases are complete. Resume from the first incomplete phase and execute through to PR creation and green CI. Output <promise>AUTONOMOUS EXECUTION COMPLETE</promise> only when the PR exists and CI is green." --completion-promise "AUTONOMOUS EXECUTION COMPLETE" --max-iterations 3`
+3. **Start Ralph Loop for hands-free execution** using the Skill tool: `/ralph-loop:ralph-loop "Continue autonomous execution. Read the plan file at docs/plans/<name>.md and the progress log at .claude/logs/autonomous/ to determine which phases are complete. Resume from the first incomplete phase and execute through to PR creation and green CI. Output <promise>AUTONOMOUS EXECUTION COMPLETE</promise> only when the PR exists and CI is green." --completion-promise "AUTONOMOUS EXECUTION COMPLETE" --max-iterations 3`
 
-   Replace `<name>` with the actual plan filename. Ralph Loop re-invokes the same prompt each iteration — Claude reads its own progress log to resume from where it left off, without user nudging. This handles everything from implementation through PR creation. Skip Phases 6-9 below — they are all handled by the loop.
+   Replace `<name>` with the actual plan filename. Ralph Loop re-invokes the same prompt each iteration — Claude reads its own progress log to resume from where it left off, without user nudging. This handles everything from implementation through PR creation. Skip Phases 6-8 below — they are all handled by the loop.
 
 ---
 
