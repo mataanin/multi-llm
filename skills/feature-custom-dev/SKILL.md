@@ -20,6 +20,22 @@ You are helping a developer implement a new feature. Follow a systematic approac
 
 ---
 
+## Session Setup
+
+**Plan mode boundary:**
+
+- **Phase 0 runs OUTSIDE plan mode** — it performs git state changes (`git fetch`, `git rebase`, `git checkout -b`) that plan mode would block.
+- **After Phase 0 completes, enter plan mode** via the `EnterPlanMode` tool. Phases 1 (Discovery), 2 (Exploration), 3 (Clarifying Questions), and Phase 4 through Step 6 (Architecture Design and user approval) all run inside plan mode — their output is research and conversation, not code or file writes.
+- **Exit plan mode via `ExitPlanMode` immediately before Phase 4 Step 7** (writing the plan file to disk). Plan mode blocks `Write`, so you cannot save the plan file while in plan mode.
+- **After the plan file is written (end of Step 7), run `/compact`** with a hint like: `/compact "preserve plan file path and feature context; drop exploration chatter, agent deliberation, and pre-plan scratch"`. The durable plan file persists on disk; the parent context does not need to retain the pre-plan research that produced it.
+- **Phase 4.5 onward runs outside plan mode** — review passes append to the plan file, and subsequent phases execute the plan.
+
+**If this skill is invoked mid-session (not from a fresh start), run `/compact` first** with a hint like: `/compact "drop unrelated work from earlier in this session; preserve only context that relates to the current feature request"`. This prevents unrelated prior-turn context from polluting the exploration, architecture, and plan-review phases below. Skip this step only if this skill is the first substantive work of the session. Do this **before** entering plan mode.
+
+**Effort level**: This workflow is planning-heavy — Phases 2 (Exploration), 4 (Architecture), and 4.5 (Plan Review) directly shape implementation. The Opus 4.7 migration guide recommends `xhigh` as the default for coding and agentic use cases. If your harness supports runtime effort selection, set `xhigh` before starting these phases.
+
+---
+
 ## Phase 0: Fresh Branch from Main
 
 **Goal**: Ensure we're starting from the latest `main` on a clean feature branch.
@@ -71,6 +87,8 @@ After the branch is ready, check if `--asana-ticket <GID>` was passed in `$ARGUM
 
 Initial request: $ARGUMENTS
 
+**Enter plan mode now** — Phase 0 (branch setup) is complete, and from here through Phase 4 Step 6 the workflow is research and conversation. Call the `EnterPlanMode` tool before the actions below.
+
 **Actions**:
 1. Create todo list with all phases
 2. If feature unclear, ask user for:
@@ -91,7 +109,7 @@ Initial request: $ARGUMENTS
 1. Launch 2 code-explorer agents in parallel with extended thinking enabled. Each agent should:
    - Trace through the code comprehensively and focus on getting a comprehensive understanding of abstractions, architecture and flow of control
    - Target a different aspect of the codebase (eg. similar features, high level understanding, architectural understanding, user experience, etc)
-   - Include a list of 5-10 key files to read
+   - Return a structured report with: (a) a synthesis of findings the parent can rely on without re-reading, (b) a **touch-list** of 3-7 files the parent must read to implement the feature (files that will be modified or are load-bearing for the design), and (c) a **reference-only list** of additional files that inform context but do not need to be read by the parent — the agent's synthesis covers them
 
    **Example agent prompts**:
    - "Find features similar to [feature] and trace through their implementation comprehensively"
@@ -117,7 +135,10 @@ Initial request: $ARGUMENTS
    Replace `<feature description>` with the actual task/feature being explored. If a script fails (tool not installed, credentials missing, timeout), check `.claude/logs/llm-errors.log` for details, report the failure cause to the user, and continue — external LLMs are supplementary.
 
 ### Consolidation
-3. Once all agents and scripts return, read all files identified by agents to build deep understanding
+3. Once all agents and scripts return:
+   - **Read the full synthesis / conclusions from every agent and external LLM report.** These are the primary output of Phase 2 — they carry the architectural understanding, patterns, and recommendations you need for Phases 3 and 4.
+   - **Additionally, open each file on the touch-lists using the Read tool.** The parent must hold first-hand content for files it will modify or that are load-bearing for the design.
+   - **Do not open reference-only files with the Read tool** — rely on the agents' syntheses for those. If a reference-only file turns out to be load-bearing during Phase 4, promote it to the touch-list then and read it.
 4. Present comprehensive summary combining findings from all sources (Claude agents + external LLMs)
 
 ---
@@ -170,6 +191,7 @@ If the user says "whatever you think is best", provide your recommendation and g
 5. **Ask user which approach they prefer**
 6. When the architecture is approved, split work into subagent tasks where possible
 7. **Save the approved plan to disk**:
+   - **Exit plan mode first** — call the `ExitPlanMode` tool. Plan mode blocks `Write`, so this must happen before the plan file is saved. After exiting, do NOT re-enter plan mode — Phase 4.5 and all subsequent phases operate outside plan mode.
    - Derive a kebab-case filename from the feature description (e.g., "LLM OCR Enhancement" → `llm-ocr-enhancement.md`)
    - Write the final approved architecture to `docs/plans/<name>.md` using the Write tool
    - The plan file should contain: Context, Key Files (to create, to modify, reference), Architecture, Implementation Details, a **QA Plan section**, and a **Production Validation section** (see below)
@@ -219,6 +241,7 @@ If the user says "whatever you think is best", provide your recommendation and g
      ```
    - Note the plan file path — you will pass it to subsequent phases
    - Tell the user: "Plan saved to `docs/plans/<name>.md`"
+   - **Clean context after the plan is written**: Run `/compact` with a hint like: `/compact "preserve the plan file path (docs/plans/<name>.md), the approved feature scope, and ASANA_TICKET_GID if set. Drop exploration findings, agent deliberation, architecture trade-off discussion, and all pre-plan research — the plan file on disk is the source of truth from here on."` The plan file persists the durable output; Phase 4.5 will re-read it from disk for the review loop.
 
 ---
 

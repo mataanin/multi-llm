@@ -159,7 +159,16 @@ If no plan file exists (standalone `/pr` invocation without `/feature-custom-dev
 
 ### Step 1: Verify effect of changes using UI
 
-Identify affected UI flows and verify changes. Three approaches:
+Identify affected UI flows and verify changes. **You must pick which verification approach(es) to run before moving on — do not defer the choice.**
+
+**Scope judgment — state which bucket this PR falls in and why, then run the matching approaches:**
+
+- **Important or complex features** (new user flows, multi-step forms, auth/billing changes, user-facing data-model changes, or anything touching more than ~3 components): run **all three** approaches below.
+- **Smaller features** (bug fixes, copy changes, style tweaks, single-component changes, backend-only work with an existing UI surface): run **at least #1**. Add #2 if the change is in a flow not covered by existing tests. Add #3 only if you need to eyeball the rendered UI to confirm the fix.
+
+Announce your scope call explicitly before executing, e.g.: *"Scoping this as important — introduces a new multi-step onboarding flow touching 5 components. Running all three approaches."* or *"Scoping this as smaller — single-component copy change covered by an existing spec. Running approach #1 only."*
+
+The three approaches:
 
 1. **Run existing e2e tests:** `cd patient-portal/e2e && npx playwright test` to catch regressions
 2. **Write verification scripts:** For new flows, write a `.spec.ts` in `patient-portal/e2e/tests/verify/` following the `playwright-testing` skill's verification template, execute it, and iterate until passing
@@ -253,22 +262,29 @@ Options:
 
 If the developer selects "Skip screenshots", proceed directly to Phase 5.
 
-### Step 3: Capture Screenshots via Playwright MCP
+### Step 3: Capture Screenshots via Subagent
 
-For each selected route:
+**Spawn a `general-purpose` subagent** (via the Agent tool) to handle all navigation, login, and screenshot capture. Dozens of Playwright MCP tool calls (navigate, wait, click, screenshot) will accumulate in the subagent's context — the parent only receives the final list of saved file paths, keeping context clean for Phase 5 (PR creation).
 
-1. **Navigate and authenticate:**
-   - Patient routes (`/patient/*`): Log in as your patient test account
-   - Admin routes (`/provider/*`): Log in as your admin/provider test account
-   - Use `mcp__playwright__browser_navigate` to reach the route
-   - Use `mcp__playwright__browser_wait_for` for network idle
+Invoke the Agent tool with a self-contained prompt containing:
 
-2. **Take screenshot** via `mcp__playwright__browser_take_screenshot` in **JPEG format**
+- The list of routes selected in Step 2
+- The frontend URL (resolve it in the parent via `source env.sh && echo $FRONTEND_URL` and paste the value into the prompt — the subagent cannot read the parent's shell environment)
+- Credentials to use (resolve from your local environment — e.g. a `.env.local` file or a password manager — and paste into the subagent prompt; **do NOT hardcode credentials in this skill**):
+  - Patient routes (`/patient/*`): your patient test account
+  - Admin routes (`/provider/*`): your admin/provider test account
+- Per-route instructions:
+  1. Navigate using `mcp__playwright__browser_navigate`
+  2. Wait for load via `mcp__playwright__browser_wait_for`
+  3. Log in with the appropriate credentials
+  4. Take a screenshot via `mcp__playwright__browser_take_screenshot` in **JPEG format**
+  5. Save to `pr-screenshots/YYYY-MM-DD-{slug}.jpg` (today's date + slugified screen name, e.g., `2026-03-03-patient-feed.jpg`)
+- Error handling: if a route fails, log a warning in the return report and continue with remaining routes. Never abort the whole batch.
+- **Required return format (keep under 150 words — no tool-call transcripts):**
+  - One line per saved screenshot: `<route> → <relative path>`
+  - One line per failure: `<route> → FAILED: <reason>`
 
-3. **Save to** `pr-screenshots/YYYY-MM-DD-{screen-name}.jpg`
-   - Use today's date and a slugified screen name (e.g., `2026-03-03-patient-feed.jpg`)
-
-**Error handling:** If navigation or screenshot fails for any route, log a warning and continue with remaining routes. Never fail the entire flow.
+Use the returned list of paths in Step 4 (commit) and Step 5 (upload).
 
 ### Step 4: Commit Screenshots
 
@@ -377,7 +393,7 @@ jq -s '{ reviews: ([.[].reviews[]] | unique_by(.timestamp) | sort_by(.timestamp)
 if ! git diff --quiet review-analytics.json; then
   git add review-analytics.json && git commit -m "Merge review-analytics.json with main to prevent conflicts
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
   git push
 fi
 ```

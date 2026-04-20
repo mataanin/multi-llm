@@ -84,9 +84,11 @@ This skill is designed to run inside a **Ralph Loop** for hands-free execution. 
 3. Create a TodoWrite checklist from the plan's implementation items
 4. Implement each item sequentially, updating todos as you go
 5. Follow codebase conventions strictly (see CLAUDE.md)
-6. After each logical chunk, run the relevant tests to catch issues early:
-   - Backend changes: `source env.sh && docker exec $PATIENT_BACKEND bundle exec rspec <relevant_spec_files>`
-   - Frontend changes: `source env.sh && docker exec $PATIENT_FRONTEND npm run lint`
+6. **After every TodoWrite task you mark complete, run the relevant tests immediately — do not batch across tasks:**
+   - If the task modified any backend file: `source env.sh && docker exec $PATIENT_BACKEND bundle exec rspec <spec_paths>`. Run rspec for the spec file corresponding to each modified production file (e.g., `app/services/foo.rb` → `spec/services/foo_spec.rb`). If a modified file has no corresponding spec, note it and continue.
+   - If the task modified any frontend file: `source env.sh && docker exec $PATIENT_FRONTEND npm run lint`
+   - If the task modified both backend and frontend files: run both.
+   - Do not wait until the end of the phase. A task is "complete" only after its tests run clean.
 7. Log progress to `.claude/logs/autonomous/<plan-name>-<date>.md` after each major item
 
 **GATE**: Do NOT proceed to Phase 2 until ALL plan items are implemented and their unit/integration tests pass. If a plan item is blocked, log it and continue with the next item, then return to blocked items.
