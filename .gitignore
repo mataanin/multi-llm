@@ -1,0 +1,108 @@
+# ===== Secrets & credentials =====
+# Never commit real environment files or credential dumps.
+.env
+.env.*
+!.env.example
+!.env.*.example
+.env.bak
+.env.backup
+.env.local
+.env.save
+*.env.bak
+
+# Generic credential / key files
+credentials
+credentials.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.secrets
+secrets.json
+secrets.yaml
+secrets.yml
+!secrets.example.*
+
+# Mobile / Firebase config — these often embed API keys
+google-services.json
+GoogleService-Info.plist
+
+# ===== LLM CLI scratch directories =====
+# External CLIs (gemini, codex, claude, cursor, copilot) write transient
+# diffs, prompts, and sometimes tokens into these dirs. Never commit them.
+.gemini/
+.codex/
+.cursor/local/
+.copilot/local/
+.claude/local/
+*.tmp-diff.txt
+tmp-diff.txt
+
+# ===== Logs =====
+*.log
+logs/
+log/
+
+# ===== Editor backups & swap files =====
+*.bak
+*.backup
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# ===== OS-generated files =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ===== IDE / editor configs =====
+.vscode/
+.idea/
+*.iml
+.fleet/
+.zed/
+
+# ===== Temp & cache =====
+*.tmp
+*.temp
+tmp/
+.tmp/
+.cache/
+
+# ===== Language-specific (in case scripts add deps) =====
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Build outputs =====
+dist/
+build/
+out/
